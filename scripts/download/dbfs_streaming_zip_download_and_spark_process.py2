@@ -1,0 +1,37 @@
+
+# Databricks Best Practice: ZIP -> DBFS -> Extract -> Spark
+
+
+# stap 1: Download ZIP direct naar DBFS (geen geheugen, geen lokaal bestand)
+# Shell-cell in Databricks notebook:
+# %sh
+wget -O /dbfs/mnt/rawdata/kadastralekaart-gml-nl-nohist.zip \
+"https://api.pdok.nl/kadaster/kadastralekaart/download/v5_0/full/predefined/kadastralekaart-gml-nl-nohist.zip"
+
+# stap 2: Pak ZIP direct uit op DBFS (geen geheugen, geen os.makedirs)
+# Shell-cell:
+# %sh
+unzip -o /dbfs/mnt/rawdata/kadastralekaart-gml-nl-nohist.zip -d /dbfs/mnt/rawdata/gml_data
+
+# stap 3: Spark-read: inspecteer bestanden en ontdek rowTag/schema
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+# Optioneel: laat zien welke bestanden er zijn uitgepakt
+files = dbutils.fs.ls("dbfs:/mnt/rawdata/gml_data")
+print("Uitgepakte bestanden:", [f.name for f in files])
+
+# Lees een aantal regels van de GML-bestanden als tekst
+df_sample = spark.read.text("dbfs:/mnt/rawdata/gml_data/*.gml")
+df_sample.show(10, truncate=False)
+
+# Later, als rowTag bekend is:
+# xml_df = spark.read.format("xml")\
+#     .option("rowTag", "<JOUW_ROW_TAG>")\
+#     .load("dbfs:/mnt/rawdata/gml_data/*.gml")
+
+print(
+    "Download, extractie en inspectie voltooid. Alles DBFS-native, "
+    "geen lokaal geheugen, geen os."
+)
